@@ -1,5 +1,20 @@
+#!/usr/bin/env bash
+# kaem run files can also be used as shellscripts
+
+# We have support for RAW strings
 /usr/bin/env echo "hello kaem"
-# /usr/bin/env
+
+# Obviously line comments
 /usr/bin/env mkdir -p bin
-/usr/bin/env gcc -ggdb kaem.c -o bin/kaem
+
+# Support for line escapes
+/usr/bin/env \
+gcc \
+-ggdb \
+kaem.c \
+-o \
+bin/kaem
+# but be careful anything after the \ is dropped
+
+# Good luck and don't use kaem unless you are bootstrapping
 /usr/bin/env echo "compile complete"
