@@ -1,0 +1,5 @@
+/usr/bin/env echo "hello kaem"
+# /usr/bin/env
+/usr/bin/env mkdir -p bin
+/usr/bin/env gcc -ggdb kaem.c -o bin/kaem
+/usr/bin/env echo "compile complete"
