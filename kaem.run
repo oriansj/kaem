@@ -2,13 +2,12 @@
 # kaem run files can also be used as shellscripts
 
 # We have support for RAW strings
-/usr/bin/env echo "hello kaem"
+echo "hello kaem"
 
 # Obviously line comments
-/usr/bin/env mkdir -p bin
+mkdir -p bin
 
 # Support for line escapes
-/usr/bin/env \
 gcc \
 -ggdb \
 kaem.c \
@@ -17,4 +16,4 @@ bin/kaem
 # but be careful anything after the \ is dropped
 
 # Good luck and don't use kaem unless you are bootstrapping
-/usr/bin/env echo "compile complete"
+echo "compile complete"
