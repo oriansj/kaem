@@ -54,12 +54,24 @@
 
 char* numerate_number(int a);
 int match(char* a, char* b);
-void file_print(char* s, FILE* f);
+void collect_comment(FILE* input);
+void collect_string(FILE* input, char* target);
+char* collect_token(FILE* input, char** envp);
+char* find_char(char* string, char a);
+char* prematch(char* search, char* field);
+char* env_lookup(char* token, char** envp);
+char* find_executable(char* name, char* PATH);
+int check_envar(char* token);
+void cd(char* path);
+void set(char** tokens);
+void execute_commands(FILE* script, char** envp);
 
 int command_done;
 int VERBOSE;
 int STRICT;
 int envp_length;
+int i_input;
+int i_token;
 
 /* Function for purging line comments */
 void collect_comment(FILE* input)
@@ -77,12 +89,13 @@ void collect_comment(FILE* input)
 }
 
 /* Function for collecting RAW strings and removing the " that goes with them */
-int collect_string(FILE* input, int index, char* target)
+void collect_string(FILE* input, char* target)
 {
 	int c;
 	do
 	{
-		require(MAX_STRING > index, "LINE IS TOO LONG\nABORTING HARD\n");
+		require(MAX_STRING > i_input, "LINE IS TOO LONG\nABORTING HARD\n");
+		require(MAX_STRING > i_token, "LINE IS TOO LONG\nABORTING HARD\n");
 		c = fgetc(input);
 		if(-1 == c)
 		{ /* We never should hit EOF while collecting a RAW string */
@@ -93,23 +106,25 @@ int collect_string(FILE* input, int index, char* target)
 		{ /* Made it to the end */
 			c = 0;
 		}
-		target[index] = c;
-		index = index + 1;
+		target[i_token] = c;
+		i_input = i_input + 1;
+		i_token = i_token + 1;
 	} while(0 != c);
-	return index;
 }
 
 /* Function to collect an individual argument or purge a comment */
-char* collect_token(FILE* input)
+char* collect_token(FILE* input, char** envp)
 {
 	char* token = calloc(MAX_STRING, sizeof(char));
 	char c;
-	int i = 0;
+	i_input = 0;
+	i_token = 0; 
 	do
 	{
 		c = fgetc(input);
 		/* Bounds checking */
-		require(MAX_STRING > i, "LINE IS TOO LONG\nABORTING HARD\n");
+		require(MAX_STRING > i_token, "LINE IS TOO LONG\nABORTING HARD\n");
+		require(MAX_STRING > i_input, "LINE IS TOO LONG\nABORTING HARD\n");
 		if(-1 == c)
 		{ /* Deal with end of file */
 			file_print("execution complete\n", stderr);
@@ -126,7 +141,7 @@ char* collect_token(FILE* input)
 		}
 		else if('"' == c)
 		{ /* RAW strings are everything between a pair of "" */
-			i = collect_string(input, i, token);
+			collect_string(input, token);
 			c = 0;
 		}
 		else if('#' == c)
@@ -140,11 +155,12 @@ char* collect_token(FILE* input)
 			fgetc(input);
 			c = 0;
 		}
-		token[i] = c;
-		i = i + 1;
+		token[i_token] = c;
+		i_token = i_token + 1;
+		i_input = i_input + 1;
 	} while (0 != c);
 
-	if(1 >= i)
+	if(1 >= i_input)
 	{ /* Nothing worth returning */
 		free(token);
 		return NULL;
@@ -263,8 +279,60 @@ int check_envar(char* token)
 	return 0;
 }
 
+/* cd builtin */
+void cd(char* path)
+{
+	require(NULL != path, "INVALID CD PATH\nABORTING HARD\n");
+	chdir(path);
+}
+
+/* set builtin */
+void set(char** tokens)
+{
+	/* Get the options */
+	char* raw = calloc(MAX_STRING, sizeof(char));
+	copy_string(raw, tokens[1]);
+	char* options = calloc(MAX_STRING, sizeof(char));
+	int i;
+	for(i = 0; i < string_length(raw) - 1; i = i + 1)
+	{
+		options[i] = raw[i + 1];
+	}
+	/* Parse the options */
+	for(i = 0; i < string_length(options); i = i + 1)
+	{
+		if(options[i] == 'a')
+		{ /* set -a is on by default and cannot be disabled at this time */
+			continue;
+		}
+		else if(options[i] == 'e')
+		{ /* Fail on failure */
+			STRICT = TRUE;
+		}
+		else if(options[i] == 'v')
+		{ /* Same as -x currently */
+			options[i] == 'x';
+			continue;
+		}
+		else if(options[i] == 'x')
+		{ /* Show commands as executed */
+			/* TODO: this currently behaves like -v. Make it do what it should */
+			VERBOSE = TRUE;
+			file_print(" +> set -x\n", stdout);
+		}
+		else
+		{
+			char* erroneous_option = calloc(1, sizeof(char));
+			erroneous_option = options[i];
+			file_print(erroneous_option, stderr);
+			file_print(" is an invalid set option!\n", stderr);
+			exit(EXIT_FAILURE);
+		}
+	}
+}
+
 /* Function for executing our programs with desired arguments */
-void execute_commands(FILE* script, char** envp, int envp_length)
+void execute_commands(FILE* script, char** envp)
 {
 	while(1)
 	{
@@ -292,7 +360,7 @@ void execute_commands(FILE* script, char** envp, int envp_length)
 		command_done = 0;
 		do
 		{
-			char* result = collect_token(script);
+			char* result = collect_token(script, envp);
 			if(NULL != result)
 			{ /* Not a comment string but an actual argument */
 				if(i >= MAX_ARGS)
@@ -323,13 +391,24 @@ void execute_commands(FILE* script, char** envp, int envp_length)
 			int skip = 0;
 			if(check_envar(tokens[0]) == 0)
 			{ /* It's an envar! */
-				if(string_length(tokens[0]) > (sizeof(char*) / sizeof(char)))
+				if(string_length(tokens[0]) > MAX_STRING)
 				{ /* String is too long; prevent buffer overflow */
 					file_print(tokens[0], stderr);
 					file_print("\nis too long to fit in envp\n", stderr);
 				}
+			}
+			if(check_envar(tokens[0]) == 0)
+			{ /* It's an envar! */
 				envp[envp_length] = tokens[0]; /* Since arrays are 0 indexed */
 				envp_length = envp_length + 1;
+			}
+			else if(match(tokens[0], "cd"))
+			{ /* cd builtin */
+				cd(tokens[1]);
+			}
+			else if(match(tokens[0], "set"))
+			{ /* set builtin */
+				set(tokens);
 			}
 			else if(match(tokens[0], ""))
 			{ /* Well, that's weird, but can happen, and leads to segfaults in exec */
@@ -461,7 +540,7 @@ int main(int argc, char** argv, char** envp)
 		exit(EXIT_FAILURE);
 	}
 
-	execute_commands(script, nenvp, envp_length);
+	execute_commands(script, nenvp);
 	fclose(script);
 	return EXIT_SUCCESS;
 }
