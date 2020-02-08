@@ -29,29 +29,6 @@
 #define MAX_ARGS 256
 //CONSTANT MAX_ARGS 256
 
-/****************************************
- * There is something unusual involving *
- * waitpid is happening here.           *
- *                                      *
- * When built by GCC, every execve is   *
- * resulting in a EXIT_FAILURE if not   *
- * Given 1 (or higher); which means     *
- * waiting for any child process whose  *
- * process group ID is equal to that of *
- * the calling process; is not working  *
- * For some reason.                     *
- *                                      *
- * When built by M2-Planet, the value   *
- * of zero results in the correct       *
- * behavior, however a higher value     *
- * Results in the process not bothering *
- * To wait before executing the next    *
- * Command.                             *
- ****************************************/
-#define waitmode 1
-//CONSTANT waitmode 0
-
-
 char* numerate_number(int a);
 int match(char* a, char* b);
 void collect_comment(FILE* input);
@@ -64,7 +41,8 @@ char* find_executable(char* name, char* PATH);
 int check_envar(char* token);
 void cd(char* path);
 void set(char** tokens);
-void execute_commands(FILE* script, char** envp);
+char* collect_variable(char* input, char** envp, char** argv);
+void execute_commands(FILE* script, char** envp, char** argv);
 
 int command_done;
 int VERBOSE;
@@ -107,8 +85,8 @@ void collect_string(FILE* input, char* target)
 			c = 0;
 		}
 		target[i_token] = c;
-		i_input = i_input + 1;
 		i_token = i_token + 1;
+		i_input = i_input + 1;
 	} while(0 != c);
 }
 
@@ -118,13 +96,13 @@ char* collect_token(FILE* input, char** envp)
 	char* token = calloc(MAX_STRING, sizeof(char));
 	char c;
 	i_input = 0;
-	i_token = 0; 
+	i_token = 0;
 	do
 	{
 		c = fgetc(input);
 		/* Bounds checking */
-		require(MAX_STRING > i_token, "LINE IS TOO LONG\nABORTING HARD\n");
 		require(MAX_STRING > i_input, "LINE IS TOO LONG\nABORTING HARD\n");
+		require(MAX_STRING > i_token, "LINE IS TOO LONG\nABORTING HARD\n");
 		if(-1 == c)
 		{ /* Deal with end of file */
 			file_print("execution complete\n", stderr);
@@ -190,6 +168,16 @@ char* prematch(char* search, char* field)
 	return field;
 }
 
+int array_length(char** array)
+{
+	int length = 0;
+	while(array[length] != NULL)
+	{
+		length = length + 1;
+	}
+	return length;
+}
+
 char* env_lookup(char* token, char** envp)
 {
 	if(NULL == envp) return NULL;
@@ -200,7 +188,7 @@ char* env_lookup(char* token, char** envp)
 		ret = prematch(token, envp[i]);
 		if(NULL != ret) return ret;
 		i = i + 1;
-	} while(NULL != envp[i]);
+	} while(0 != envp[i]);
 	return NULL;
 }
 
@@ -329,8 +317,8 @@ void set(char** tokens)
 		}
 		else
 		{
-			char* erroneous_option = calloc(1, sizeof(char));
-			erroneous_option = options[i];
+			char* erroneous_option = calloc(2, sizeof(char));
+			erroneous_option[0] = options[i];
 			file_print(erroneous_option, stderr);
 			file_print(" is an invalid set option!\n", stderr);
 			exit(EXIT_FAILURE);
@@ -338,12 +326,181 @@ void set(char** tokens)
 	}
 }
 
+/* echo builtin */
+void echo(char** tokens)
+{
+	int i;
+	for(i = 1; i < array_length(tokens); i = i + 1)
+	{
+		file_print(tokens[i], stdout);
+		file_print(" ", stdout);
+	}
+	file_print("\n", stdout);
+}
+
+int execute(char** tokens, char** envp, char* PATH)
+{
+	int status;
+	char* program = find_executable(tokens[0], PATH);
+	if(NULL == program)
+	{
+		file_print(tokens[0], stderr);
+		file_print("\nfailed to execute\n", stderr);
+		exit(EXIT_FAILURE);
+	}
+
+	int f = fork();
+	if (f == -1)
+	{
+		file_print("fork() failure", stderr);
+		exit(EXIT_FAILURE);
+	}
+	else if (f == 0)
+	{ /* child */
+		/* execve() returns only on error */
+		execve(program, tokens, envp);
+		/* Prevent infinite loops */
+		_exit(EXIT_SUCCESS);
+	}
+
+	/* Otherwise we are the parent */
+	/* And we should wait for it to complete */
+	waitpid(f, &status, 0);
+
+	return status;
+}
+
+char* variable_substitute(char* input, char** envp)
+{
+	char* output = calloc(MAX_STRING, sizeof(char));
+	char* var_name = calloc(MAX_STRING, sizeof(char));
+	int eval_var = 0;
+	int i = 2;
+	while(i < string_length(input))
+	{
+		char c = input[i];
+		require(MAX_STRING > i_input, "LINE IS TOO LONG\nABORTING HARD\n");
+		require(MAX_STRING > i_token, "LINE IS TOO LONG\nABORTING HARD\n");
+		if(-1 == c)
+		{ /* We never should hit EOF while collecting a variable */
+			file_print("IMPROPERLY TERMINATED VARIABLE!\nABORTING HARD\n", stderr);
+			exit(EXIT_FAILURE);
+		}
+		else if('\n' == c)
+		{ /* Why are we hitting a EOL */
+			file_print("IMPROPERLY TERMINATED VARIABLE!\nABORTING HARD\n", stderr);
+			exit(EXIT_FAILURE);
+		}
+		else if('\\' == c)
+		{ /* Drop the char after */
+			i = i + 2;
+		}
+		else if(':' == c)
+		{ /* Special stuff */
+			i = i + 1;
+			c = input[i];
+			if('-' == c)
+			{ /* ${var1-$var2} if var1 is unset substitute var2 */
+				var_name = postpend_char(var_name, '=');
+				if(env_lookup(var_name, envp) == NULL)
+				{ /* var1 is unset */
+					memset(var_name, 0, MAX_STRING);
+					var_name = ""; /* Reset and get the rest */
+					eval_var = 1;
+				}
+				else
+				{
+					/* We've collected everything */
+					break;
+				}
+				i = i + 1;
+			}
+			else
+			{
+				var_name = postpend_char(var_name, input[i - 1]);
+			}
+		}
+		else if('}' == c)
+		{ /* End of variable name */
+			if(eval_var == 0)
+			{
+				var_name = postpend_char(var_name, '=');
+			}
+			break;
+		}
+		else
+		{
+			var_name = postpend_char(var_name, c);
+			i = i + 1;
+		}
+	}
+
+	/* Substitute the variable */
+	if(eval_var == 0)
+	{
+		output = env_lookup(var_name, envp);
+		if(output == NULL)
+		{
+			output = "";
+		}
+	}
+	else
+	{
+		copy_string(output, var_name);
+	}
+
+	return output;
+}
+
+/* Function to concatanate all variables */
+char* variable_all(char* input, char** argv)
+{
+	char* output = calloc(MAX_STRING, sizeof(char));
+	int i;
+	int length = array_length(argv);
+	for(i = 0; i < length; i = i + 1)
+	{
+		output = prepend_string(output, argv[i]);
+		output = prepend_string(output, " ");
+	}
+	return output;
+}
+
+
+/* Function to substitute variables */
+char* collect_variable(char* input, char** envp, char** argv)
+{
+	if(input[0] != '$')
+	{
+		char* output = calloc(MAX_STRING, sizeof(char));
+		copy_string(output, input);
+		return output;
+	}
+
+	if(input[1] == '{')
+	{
+		return variable_substitute(input, envp);
+	}
+	else if(input[1] == '@')
+	{
+		return variable_all(input, argv);
+	}
+	else
+	{
+		file_print("IMPROPERLY USED VARIABLE!\nABORTING HARD\n", stderr);
+		exit(EXIT_FAILURE);
+	}
+
+	/* Get the name of the variable */
+}
+
 /* Function for executing our programs with desired arguments */
-void execute_commands(FILE* script, char** envp)
+void execute_commands(FILE* script, char** envp, char** argv)
 {
 	while(1)
 	{
 		char** tokens = calloc(MAX_ARGS, sizeof(char*));
+
 		char* PATH = env_lookup("PATH=", envp);
 		if(NULL != PATH)
 		{
@@ -363,11 +520,11 @@ void execute_commands(FILE* script, char** envp)
 		}
 
 		int i = 0;
-		int status = 0;
 		command_done = 0;
 		do
 		{
-			char* result = collect_token(script, envp);
+			char* result = calloc(MAX_STRING, sizeof(char));
+			result = collect_token(script, envp);
 			if(NULL != result)
 			{ /* Not a comment string but an actual argument */
 				if(i >= MAX_ARGS)
@@ -390,6 +547,17 @@ void execute_commands(FILE* script, char** envp)
 				fputc(' ', stdout);
 			}
 			file_print("\n", stdout);
+		}
+
+		int j = 0;
+		while(tokens[j] != NULL)
+		{
+			char* output = calloc(MAX_STRING, sizeof(char));
+			output = collect_variable(tokens[j], envp, argv);
+			int h;
+			memset(tokens[j], 0, MAX_STRING);
+			copy_string(tokens[j], output);
+			j = j + 1;
 		}
 
 		if(0 < i)
@@ -421,38 +589,17 @@ void execute_commands(FILE* script, char** envp)
 			{ /* set builtin */
 				set(tokens);
 			}
+			else if(match(tokens[0], "echo"))
+			{ /* echo builtin */
+				echo(tokens);
+			}
 			else if(match(tokens[0], ""))
 			{ /* Well, that's weird, but can happen, and leads to segfaults in exec */
 				skip = 1;
 			}
 			else if(skip == 0)
 			{ /* Stuff to exec */
-				char* program = find_executable(tokens[0], PATH);
-				if(NULL == program)
-				{
-					file_print(tokens[0], stderr);
-					file_print(" failed to execute\n", stderr);
-					exit(EXIT_FAILURE);
-				}
-
-				int f = fork();
-				if (f == -1)
-				{
-					file_print("fork() failure", stderr);
-					exit(EXIT_FAILURE);
-				}
-				else if (f == 0)
-				{ /* child */
-					/* execve() returns only on error */
-					execve(program, tokens, envp);
-					/* Prevent infinite loops */
-					_exit(EXIT_FAILURE);
-				}
-
-				/* Otherwise we are the parent */
-				/* And we should wait for it to complete */
-				waitpid(f, &status, waitmode);
-
+				int status = execute(tokens, envp, PATH);
 				if(STRICT && (0 != status))
 				{ /* Clearly the script hit an issue that should never have happened */
 					file_print("Subprocess error ", stderr);
@@ -493,7 +640,7 @@ int main(int argc, char** argv, char** envp)
 
 	for(i = envp_length; i < (envp_length + MAX_ARGS); i = i + 1)
 	{
-		nenvp[i] = "";
+		nenvp[i] = 0;
 	}
 
 	i = 1;
@@ -551,7 +698,7 @@ int main(int argc, char** argv, char** envp)
 		exit(EXIT_FAILURE);
 	}
 
-	execute_commands(script, nenvp);
+	execute_commands(script, nenvp, argv);
 	fclose(script);
 	return EXIT_SUCCESS;
 }
