@@ -14,5 +14,9 @@ kaem:
 		variable.c \
 		kaem.c
 
+check: kaem
+	./test.sh
+
 clean:
 	rm bin/*
+	./test.cleanup.sh
