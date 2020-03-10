@@ -396,7 +396,7 @@ int cd()
 int pwd()
 {
 	char* path = calloc(MAX_STRING, sizeof(char));
-	require(path == NULL, "Memory initialization of path in pwd failed\n");
+	require(path != NULL, "Memory initialization of path in pwd failed\n");
 	getcwd(path, MAX_STRING);
 	require(path != "", "getcwd() failed\n");
 	file_print(path, stdout);
