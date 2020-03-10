@@ -14,8 +14,5 @@
 # You should have received a copy of the GNU General Public License
 # along with mescc-tools.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Test simple variable substitution
-VAR=text
-ANOTHER=more
+# Test simple variable substitution, passed to another kaem
 echo text-${VAR}-${ANOTHER}-text
-./bin/kaem -f test/test10/subkaem.test

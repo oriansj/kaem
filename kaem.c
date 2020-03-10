@@ -138,7 +138,9 @@ char** list_to_array(struct Token* s)
 	struct Token* n;
 	n = s;
 	char** array = calloc(MAX_ARRAY, sizeof(char*));
-	require(array != NULL, "Memory initialization of array in conversion of struct to array failed\n");
+	require(array != NULL, "Memory initialization of array in conversion of list to array failed\n");
+	char* element = calloc(MAX_STRING, sizeof(char));
+	require(element != NULL, "Memory initalization of element in conversion of list to array failed\n");
 	int index = 0;
 	int i;
 	int value_length;
@@ -146,40 +148,39 @@ char** list_to_array(struct Token* s)
 	int offset;
 	while(n != NULL)
 	{ /* Loop through each node and assign it to an array index */
+		array[index] = calloc(MAX_STRING, sizeof(char));
+		require(array[index] != NULL, "Memory initialization of array[index] in conversion of list to array failed\n");
 		/* Bounds checking */
 		/* No easy way to tell which it is, output generic message */
 		require(index < MAX_ARRAY, "SCRIPT TOO LONG or TOO MANY ENVARS\nABORTING HARD\n");
-		/***********************************************************************
-		 * XXX: Hacky. index will never be over MAX_STRING. We tell apart the  *
-		 * token list from the env list by the contents of the pos/var union.  *
-		 * Since index is less than MAX_STRING, if it is over MAX_STRING, we   *
-		 * can be reasonably sure that we are actually looking at var, and     *
-		 * hence it is part of the env linked list. If it is under MAX_STRING  *
-		 * then it should be part of the token linked-list.                    *
-		 ***********************************************************************/
-		if(index <= MAX_STRING)
-		{ /* It is a line -- hopefully. See above comment. */
+		if(n->var == NULL)
+		{ /* It is a line */
 			array[index] = n->value;
 		}
 		else
-		{ /* It is a var -- hopefully. See above comment. */
+		{ /* It is a var */
 			/* prepend_string(n->var, prepend_string("=", n->value)) */
 			var_length = string_length(n->var);
 			for(i = 0; i < var_length; i = i + 1)
 			{
-				array[index][i] = n->var[i];
+				element[i] = n->var[i];
 			}
+			element[i] = '=';
 			i = i + 1;
-			array[index][i] = '=';
 			offset = i;
 			value_length = string_length(n->value);
 			for(i = 0; i < value_length; i = i + 1)
 			{
-				array[index][i + offset] = n->value[i];
+				element[i + offset] = n->value[i];
 			}
 		}
+		copy_string(array[index], element);
+
 		n = n->next;
 		index = index + 1;
+
+		/* Reset element */
+		for(i = 0; i < MAX_STRING; i = i + 1) element[i] = 0;
 	}
 	return array;
 }
