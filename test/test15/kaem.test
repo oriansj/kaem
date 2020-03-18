@@ -1,4 +1,6 @@
 VAR=test
+ANOTHER=test2
 echo ${VAR}
-unset VAR
+unset VAR ANOTHER
 echo ${VAR}
+echo ${ANOTHER}
