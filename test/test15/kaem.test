@@ -1,0 +1,4 @@
+VAR=test
+echo ${VAR}
+unset VAR
+echo ${VAR}

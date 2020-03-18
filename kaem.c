@@ -464,8 +464,6 @@ int set()
 /* echo builtin */
 void echo()
 {
-	struct Token* n;
-	n = token;
 	if(token->next == NULL)
 	{ /* No arguments */
 		file_print("\n", stdout);
@@ -486,6 +484,33 @@ void echo()
 		token = token->next;
 	}
 	file_print("\n", stdout);
+}
+
+/* unset builtin */
+void unset()
+{
+	struct Token* e;
+	/* We support multiple variables on the same line */
+	struct Token* t;
+	t = token->next;
+	while(t != NULL)
+	{
+		e = env;
+		/* Look for the variable; we operate on ->next because we need to remove ->next */
+		while(e->next != NULL)
+		{
+			if(match(e->next->var, t->value))
+			{
+				break;
+			}
+			e = e->next;
+		}
+		t = t->next;
+		/* If it's NULL nothing was found */
+		if(e->next == NULL) continue;
+		/* Otherwise there is something to unset */
+		e->next = e->next->next;
+	}
 }
 
 /* Execute program */
@@ -523,6 +548,11 @@ int execute(char** argv)
 	else if(match(token->value, "echo"))
 	{
 		echo();
+		return 0;
+	}
+	else if(match(token->value, "unset"))
+	{
+		unset();
 		return 0;
 	}
 
