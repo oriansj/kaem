@@ -336,6 +336,13 @@ int is_envar(char* token)
 /* Add an envar */
 int add_envar()
 {
+	/* If we are in init-mode and this is the first var env == NULL, rectify */
+	if(env == NULL)
+	{
+		env = calloc(1, sizeof(struct Token));
+		require(env != NULL, "Memory initialization of env failed\n");
+	}
+
 	struct Token* n;
 	n = env;
 	/* Traverse to end of linked-list */
@@ -345,9 +352,13 @@ int add_envar()
 		n = n->next;
 	}
 	/* Initialize new node */
-	n->next = calloc(1, sizeof(struct Token));
-	require(n->next != NULL, "Memory initialization of next env node in add_envar failed\n");
-	n = n->next;
+	/* See first comment, this situation means no new node */
+	if(n->value != NULL || n->var != NULL || n->next != NULL)
+	{
+		n->next = calloc(1, sizeof(struct Token));
+		require(n->next != NULL, "Memory initialization of next env node in add_envar failed\n");
+		n = n->next;
+	}
 
 	/* 
 	 * If you are confused about n->* and token->value here:
@@ -701,8 +712,12 @@ void run_script(FILE* script, char** argv)
 /* Function to populate env */
 void populate_env(char** envp)
 {
+	/* Initialize env and n */
+	env = calloc(1, sizeof(struct Token));
+	require(env != NULL, "Memory initialization of env failed\n");
 	struct Token* n;
 	n = env;
+
 	int i;
 	for(i = 0; i < array_length(envp); i = i + 1)
 	{
@@ -762,9 +777,6 @@ int main(int argc, char** argv, char** envp)
 	/* Initalize structs */
 	token = calloc(1, sizeof(struct Token));
 	require(token != NULL, "Memory initialization of token failed\n");
-
-	env = calloc(1, sizeof(struct Token));
-	require(env != NULL, "Memory initialization of env failed\n");
 
 	int i = 1;
 	/* Loop over arguments */
