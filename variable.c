@@ -194,6 +194,17 @@ void variable_all(char** argv, struct Token* n)
 		/* Ends up with (n->value) (argv[i]) */
 		/* If we don't do this we get jumbled results in M2-Planet */
 		copy_string(argv_element, argv[i]);
+		if(match(argv_element, "--"))
+		{ /* -- signifies everything after this */
+			/* Reset n->value */
+			for(j = 0; j < MAX_STRING; j = j + 1)
+			{
+				n->value[j] = 0;
+			}
+			index = 0;
+			/* Skip the rest of the loop */
+			continue;
+		}
 		/* Copy argv_element into n->value */
 		argv_element_length = string_length(argv[i]);
 		for(j = 0; j < argv_element_length; j = j + 1)
@@ -204,6 +215,11 @@ void variable_all(char** argv, struct Token* n)
 		/* Add space on the end */
 		n->value[index] = ' ';
 		index = index + 1;
+		/* Reset argv_element */
+		for(j = 0; j < MAX_STRING; j = j + 1)
+		{
+			argv_element[j] = 0;
+		}
 	}
 	/* Remove trailing space */
 	index = index - 1;

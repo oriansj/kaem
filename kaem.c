@@ -380,7 +380,7 @@ int add_envar()
 
 	/* Get n->value */
 	index = index + 1; /* Skip over = */
-	int offset = index;
+int offset = index;
 	n->value = calloc(MAX_STRING, sizeof(char));
 	require(n->value != NULL, "Memory initialization of n->value in add_envar failed\n");
 	/* Copy into n->value up to end of token */
@@ -830,6 +830,10 @@ int main(int argc, char** argv, char** envp)
 		{ /* Set fuzzing */
 			FUZZING = TRUE;
 			i = i + 1;
+		}
+		else if(match(argv[i], "--"))
+		{ /* Nothing more after this */
+			break;
 		}
 		else
 		{ /* We don't know this argument */
