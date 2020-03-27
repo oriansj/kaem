@@ -790,7 +790,16 @@ int main(int argc, char** argv, char** envp)
 		{ /* Help information */
 			file_print("Usage: ", stdout);
 			file_print(argv[0], stdout);
-			file_print(" [-h | --help] [-V | --version] [--file filename | -f filename] [-i | --init-mode] [-v | --verbose] [--strict] [--warn] [--fuzz]\n", stdout);
+			file_print(" [OPTIONS] filename [--] arguments \n", stdout);
+			file_print(" -h, --help           Output usage\n", stdout);
+			file_print(" -V, --version        Output the version\n", stdout);
+			file_print(" -i, --init-mode      Strip out the environment\n", stdout);
+			file_print(" -v, --verbose        Output each command before it is run\n", stdout);
+			file_print(" --strict             Exit on subprocess failure\n", stdout);
+			file_print(" --warn               Output warnings for potentially undesired behaviour (useful in development)\n", stdout);
+			file_print(" --fuzz               Don't actually run the commands, so fuzzing dosen't execute dangerous commands\n", stdout);
+			file_print(" -f, --file           Legacy way to specify the filename\n", stdout);
+			file_print(" --                   Seperates kaem arguments from script arguments, only used but required when -f is used\n", stdout);
 			exit(EXIT_SUCCESS);
 		}
 		else if(match(argv[i], "-f") || match(argv[i], "--file"))
@@ -833,6 +842,11 @@ int main(int argc, char** argv, char** envp)
 		}
 		else if(match(argv[i], "--"))
 		{ /* Nothing more after this */
+			break;
+		}
+		else if(argv[i][0] != '-')
+		{ /* Assume this is the name of the script - after we get the name, nothing more */
+			filename = argv[i];
 			break;
 		}
 		else

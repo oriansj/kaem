@@ -189,24 +189,50 @@ void variable_all(char** argv, struct Token* n)
 	int argv_element_length;
 	char* argv_element = calloc(MAX_STRING, sizeof(char));
 	/* We don't want argv[0], as that contains the path to kaem */
+	/*
+	 * Loop through the arguments until we find the delimter between kaem args
+	 * and script args.
+	 */
 	for(i = 1; i < argv_length; i = i + 1)
 	{
-		/* Ends up with (n->value) (argv[i]) */
+		/* Reset argv_element */
+		for(j = 0; j < MAX_STRING; j = j + 1)
+		{
+			argv_element[j] = 0;
+		}
 		/* If we don't do this we get jumbled results in M2-Planet */
 		copy_string(argv_element, argv[i]);
-		if(match(argv_element, "--"))
-		{ /* -- signifies everything after this */
-			/* Reset n->value */
-			for(j = 0; j < MAX_STRING; j = j + 1)
-			{
-				n->value[j] = 0;
-			}
-			index = 0;
-			/* Skip the rest of the loop */
+		if(match(argv_element, "-f"))
+		{
+			/*
+			 * Skip over the next argument, otherwise the next block will catch
+			 * it in an incorrect way for -f.
+			 */
+			i = i + 1;
+			/*
+			 * Skip the rest of the loop to get for's i = i + 1 done without
+			 * triggering the next block.
+			 */
 			continue;
 		}
+		if(match(argv_element, "--") || argv_element[0] != '-')
+		{ /* -- or the script name signifies everything after this */
+			i = i + 1;
+			break;
+		}
+	}
+	/* We now know that argv[i] contains the first script argument */
+	for(i; i < argv_length; i = i + 1)
+	{
+		/* Reset argv_element */
+		for(j = 0; j < MAX_STRING; j = j + 1)
+		{
+			argv_element[j] = 0;
+		}
+		/* Ends up with (n->value) (argv[i]) */
 		/* Copy argv_element into n->value */
-		argv_element_length = string_length(argv[i]);
+		copy_string(argv_element, argv[i]);
+		argv_element_length = string_length(argv_element);
 		for(j = 0; j < argv_element_length; j = j + 1)
 		{
 			n->value[index] = argv_element[j];
@@ -215,11 +241,6 @@ void variable_all(char** argv, struct Token* n)
 		/* Add space on the end */
 		n->value[index] = ' ';
 		index = index + 1;
-		/* Reset argv_element */
-		for(j = 0; j < MAX_STRING; j = j + 1)
-		{
-			argv_element[j] = 0;
-		}
 	}
 	/* Remove trailing space */
 	index = index - 1;
