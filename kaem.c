@@ -727,6 +727,7 @@ int collect_command(FILE* script, char** argv)
 	while(command_done == FALSE)
 	{
 		n->value = calloc(MAX_STRING, sizeof(char));
+		require(n->value != NULL, "Memory initialization of n->value in collect_command failed\n");
 		index = collect_token(script, n);
 		/* Don't allocate another node if the current one yielded nothing, OR
 		 * if we are done.
@@ -734,7 +735,7 @@ int collect_command(FILE* script, char** argv)
 		if((n->value != NULL && match(n->value, "") == FALSE) && command_done == FALSE)
 		{
 			n->next = calloc(MAX_STRING, sizeof(char));
-			require(token != NULL, "Memory initialization of next token node in collect_command failed\n");
+			require(n->next != NULL, "Memory initialization of next token node in collect_command failed\n");
 			n = n->next;
 		}
 	}
