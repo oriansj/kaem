@@ -219,7 +219,7 @@ void variable_all(char** argv, struct Token* n)
 {
 	fflush(stdout);
 	/* index refernences the index of n->value, unlike other functions */
-	int index;
+	int index = 0;
 	int argv_length = array_length(argv);
 	int i;
 	int j;

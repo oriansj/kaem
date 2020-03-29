@@ -335,7 +335,7 @@ int is_envar(char* token)
 }
 
 /* Add an envar */
-int add_envar()
+int add_envar(char* var, char* value)
 {
 	/* If we are in init-mode and this is the first var env == NULL, rectify */
 	if(env == NULL)
@@ -346,52 +346,99 @@ int add_envar()
 
 	struct Token* n;
 	n = env;
-	/* Traverse to end of linked-list */
+	/* Traverse to end of linked-list, stopping if the var already exists */
 	while(n->next != NULL)
 	{
-		if(n->next->value == NULL || n->next->var == NULL) break;
+		if(match(n->var, var))
+		{ /* It already exists, overwrite it */
+			break;
+		}
 		n = n->next;
 	}
 	/* Initialize new node */
-	/* See first comment, this situation means no new node */
-	if(n->value != NULL || n->var != NULL || n->next != NULL)
+	/* 
+	 * See first comment, this situation means no new node.
+	 * This can also occur when we have found this variable already set and we
+	 * want to overwrite it.
+	 */
+	if((n->value != NULL || n->var != NULL) && n->next == NULL)
 	{
-		n->next = calloc(1, sizeof(struct Token));
-		require(n->next != NULL, "Memory initialization of next env node in add_envar failed\n");
-		n = n->next;
+		if(!match(n->var, var))
+		{
+			n->next = calloc(1, sizeof(struct Token));
+			require(n->next != NULL, "Memory initialization of next env node in add_envar failed\n");
+			n = n->next;
+		}
 	}
 
-	/* 
-	 * If you are confused about n->* and token->value here:
-	 * token->value: is the token with the raw data. Part of token linked list.
-	 * n->*: is where it goes. Part of env linked list.
-	 */
-	/* Get n->var */
+	/* Write n->var */
+	if(n->var == NULL)
+	{
+		n->var = calloc(MAX_STRING, sizeof(char));
+	}
+	else
+	{
+		/* Reset n->var */
+		int i;
+		for(i = 0; i < MAX_STRING; i = i + 1)
+		{
+			n->var[i] = 0;
+		}
+	}
+
+	copy_string(n->var, var);
+
+	/* Write n->value */
+	if(n->value == NULL)
+	{
+		n->value = calloc(MAX_STRING, sizeof(char));
+	}
+	else
+	{
+		/* Reset n->value */
+		int i;
+		for(i = 0; i < MAX_STRING; i = i + 1)
+		{
+			n->value[i] = 0;
+		}
+	}
+	copy_string(n->value, value);
+
+	return FALSE;
+}
+
+/* Handle envars */
+int handle_envar()
+{
+	/* Get var_name */
+	char* var_name = calloc(MAX_STRING, sizeof(char));
+	require(var_name != NULL, "Memory initialization of n->var in add_envar failed\n");
 	int index = 0;
-	n->var = calloc(MAX_STRING, sizeof(char));
-	require(n->var != NULL, "Memory initialization of n->var in add_envar failed\n");
 	int token_length = string_length(token->value);
-	/* Copy into n->var up to = */
+	/* Copy into var_name up to = */
 	while(token->value[index] != '=')
 	{
 		if(index >= token_length) return TRUE;
-		n->var[index] = token->value[index];
+		var_name[index] = token->value[index];
 		index = index + 1;
 	}
 
-	/* Get n->value */
+	/* Get value */
+	char* value = calloc(MAX_STRING, sizeof(char));
 	index = index + 1; /* Skip over = */
 	int offset = index;
-	n->value = calloc(MAX_STRING, sizeof(char));
-	require(n->value != NULL, "Memory initialization of n->value in add_envar failed\n");
+	value = calloc(MAX_STRING, sizeof(char));
+	require(value != NULL, "Memory initialization of n->value in add_envar failed\n");
 	/* Copy into n->value up to end of token */
 	while(token->value[index] != 0)
 	{
 		if(index >= token_length) return TRUE;
-		n->value[index - offset] = token->value[index];
+		value[index - offset] = token->value[index];
 		index = index + 1;
 	}
-	return FALSE;
+
+	/* Write in */
+	return add_envar(var_name, value);
 }
 
 /* cd builtin */
@@ -575,7 +622,7 @@ int execute(char** argv)
 	/* Actually do the execution */
 	if(is_envar(token->value) == TRUE)
 	{
-		rc = add_envar();
+		rc = handle_envar();
 		if(STRICT) require(rc == FALSE, "Adding of an envar failed!\n");
 		return 0;
 	}
@@ -908,24 +955,17 @@ int main(int argc, char** argv, char** envp)
 		populate_env(envp);
 	}
 
-	/* Populate PATH variable
-	 * We don't need to calloc() because env_lookup() does this for us.
-	 */
-	PATH = env_lookup("PATH");
-
 	/* Populate USERNAME variable */
 	char* USERNAME = env_lookup("LOGNAME");
 
 	/* Handle edge cases */
-	if((NULL == PATH) && (NULL == USERNAME))
+	if((NULL == env_lookup("PATH")) && (NULL == USERNAME))
 	{ /* We didn't find either of PATH or USERNAME -- use a generic PATH */
-		PATH = calloc(MAX_STRING, sizeof(char));
-		require(PATH != NULL, "Memory initialization of PATH failed\n");
-		copy_string(PATH, "/root/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
+		add_envar("PATH", "/root/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
 	}
-	else if(NULL == PATH)
+	else if(NULL == env_lookup("PATH"))
 	{ /* We did find a username but not a PATH -- use a generic PATH but with /home/USERNAME */
-		PATH = prepend_string("/home/", prepend_string(USERNAME,"/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games"));
+		add_envar("PATH", prepend_string("/home/", prepend_string(USERNAME,"/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games")));
 	}
 
 	/* Open the script */

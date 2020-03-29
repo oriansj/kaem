@@ -48,7 +48,6 @@ int STRICT;
 int INIT_MODE; 
 int FUZZING;
 int WARNINGS;
-char* PATH;
 
 /*
  * Here is the token struct. It is used for both the token linked-list and
