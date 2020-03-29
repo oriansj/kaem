@@ -80,9 +80,10 @@ char* find_executable(char* name)
 	}
 
 	char* trial = calloc(MAX_STRING, sizeof(char));
-	char* MPATH = calloc(MAX_STRING, sizeof(char)); /* Modified PATH */
+	require(trial != NULL, "Memory initialization of trial in find_executable failed\n");
+	char* MPATH = calloc(MAX_STRING, sizeof(char));
 	require(MPATH != NULL, "Memory initialization of MPATH in find_executable failed\n");
-	copy_string(MPATH, PATH);
+	copy_string(MPATH, env_lookup("PATH"));
 	FILE* t;
 	char* next = find_char(MPATH, ':');
 	int index;
@@ -380,7 +381,7 @@ int add_envar()
 
 	/* Get n->value */
 	index = index + 1; /* Skip over = */
-int offset = index;
+	int offset = index;
 	n->value = calloc(MAX_STRING, sizeof(char));
 	require(n->value != NULL, "Memory initialization of n->value in add_envar failed\n");
 	/* Copy into n->value up to end of token */
@@ -524,6 +525,46 @@ void unset()
 	}
 }
 
+/* Handle shebangs */
+char* handle_shebang(char* program)
+{
+	FILE* script = fopen(program, "r");
+
+	/* Check if the first two characters are #! */
+	char c = fgetc(script);
+	if(c != '#') return program;
+	c = fgetc(script);
+	if(c != '!') return program;
+
+	/* Get the rest of the shebang */
+	char* shebang = calloc(MAX_STRING, sizeof(char));
+	require(shebang != NULL, "Memory initialization of shebang in handle_shebang failed\n");
+	int i = 0;
+	c = fgetc(script);
+	while(c != '\n')
+	{
+		shebang[i] = c;
+		c = fgetc(script);
+		i = i + 1;
+	}
+
+	/* Is it something we need to look up in PATH? */
+	if(shebang[0] != '/' && shebang[0] != '.')
+	{
+		shebang = find_executable(shebang);
+		if(shebang == NULL) return program;
+	}
+
+	/* Add to tokens */
+	struct Token* n = calloc(1, sizeof(struct Token));
+	require(n != NULL, "Memory initialization of n in handle_shebang failed\n");
+	n->value = shebang;
+	n->next = token;
+	token = n;
+
+	return shebang;
+}
+
 /* Execute program */
 int execute(char** argv)
 { /* Run the command */
@@ -568,11 +609,11 @@ int execute(char** argv)
 	}
 
 	/* If it is not a builtin, run it as an executable */
-	int status; /* i.e. return code */
 	char** array;
 	char** envp;
 	/* Get the full path to the executable */
 	char* program = find_executable(token->value);
+	token->value = program;
 	/* Check we can find the executable */
 	if(NULL == program)
 	{ 
@@ -586,6 +627,9 @@ int execute(char** argv)
 		/* If we are not strict simply return */
 		return 0;
 	}
+
+	/* Handle shebangs */
+	program = handle_shebang(program);
 
 	int f = fork();
 	/* Ensure fork succeeded */
@@ -618,9 +662,9 @@ int execute(char** argv)
 
 	/* Otherwise we are the parent */
 	/* And we should wait for it to complete */
-	waitpid(f, &status, 0);
+	waitpid(f, &rc, 0);
 
-	return status;
+	return rc;
 }
 
 int collect_command(FILE* script, char** argv)
