@@ -25,6 +25,43 @@
 int array_length(char** array);
 char* env_lookup(char* variable);
 
+struct Token* variable_tokenize(struct Token* n)
+{
+	int i;
+	int j;
+	int value_length = string_length(n->value);
+	char* input = calloc(MAX_STRING, sizeof(char));
+	copy_string(input, n->value);
+	/* Reset n->value */
+	for(i = 0; i < MAX_STRING; i = i + 1)
+	{
+		n->value[i] = 0;
+	}
+	struct Token* m = n;
+	int k = 0;
+	for(i = 0; i < value_length; i = i + 1)
+	{
+		if(input[i] == ' ' || input[i] == '\t')
+		{ /* Split out into a new token */
+			/* Create the new node */
+			/* m is for n->next jumping around */
+			m = calloc(1, sizeof(struct Token));
+			m->next = n->next;
+			n->next = m;
+			/* Now we don't need m */
+			n = n->next;
+			n->value = calloc(MAX_STRING, sizeof(char));
+			k = 0;
+		}
+		else
+		{
+			n->value[k] = input[i];
+			k = k + 1;
+		}
+	}
+	return n;
+}
+
 /*
  * VARIABLE HANDLING FUNCTIONS
  */
@@ -248,7 +285,7 @@ void variable_all(char** argv, struct Token* n)
 }
 
 /* Function controlling substitution of variables */
-void handle_variables(char** argv, struct Token* n)
+struct Token* handle_variables(char** argv, struct Token* n)
 {
 	/* NOTE: index is the position of input */
 	int index = 0;
@@ -271,7 +308,7 @@ void handle_variables(char** argv, struct Token* n)
 		if(input[index] == 0)
 		{ /* No variable in it */
 			n->value = input;
-			return; /* We don't need to do anything more */
+			return n; /* We don't need to do anything more */
 		}
 		n->value[index] = input[index];
 		index = index + 1;
@@ -311,4 +348,14 @@ substitute:
 		n->value[index + offset] = input[index];
 		index = index + 1;
 	}
+
+	/* ------------------------------------------------------------------------
+	 * | We need to tokenize the variables we have substituted now. You might |
+	 * | ask, why not just tokenize everything after variable substitution?   |
+	 * | It is because the tokenization process is rather different. For      |
+	 * | example, if we found a #, we don't want that to be a line comment.   |
+	 * | Mainly, we just want to seperate on spaces and tabs.                 |
+	 * ----------------------------------------------------------------------*/
+
+	return variable_tokenize(n);
 }

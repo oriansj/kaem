@@ -23,7 +23,7 @@
 #include "kaem.h"
 
 /* Prototypes from other files */
-void handle_variables(char** argv, struct Token* n);
+struct Token* handle_variables(char** argv, struct Token* n);
 
 /*
  * UTILITY FUNCTIONS
@@ -654,7 +654,9 @@ int collect_command(FILE* script, char** argv)
 	while(n != NULL)
 	{ /* Substitute variables into each token */
 		if(n->value == NULL) break;
-		handle_variables(argv, n);
+		n = handle_variables(argv, n);
+		/* There is potential that it could have moved n to the last node */
+		if(n->next == NULL) break;
 		/* Advance to next node */
 		n = n->next;
 	}
