@@ -654,6 +654,10 @@ int execute(char** argv)
 		unset();
 		return 0;
 	}
+	else if(match(token->value, ""))
+	{
+		return 0;
+	}
 
 	/* If it is not a builtin, run it as an executable */
 	char** array;
