@@ -609,7 +609,8 @@ char* handle_shebang(char* program)
 	n->next = token;
 	token = n;
 
-	return shebang;
+	/* Recursive shebangs! */
+	return handle_shebang(shebang);
 }
 
 /* Execute program */
