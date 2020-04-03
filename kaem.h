@@ -49,6 +49,16 @@ int INIT_MODE;
 int FUZZING;
 int WARNINGS;
 
+/* Types for the token */
+#define NORMAL 0
+// CONSTANT NORMAL 0
+#define COMMENT 1
+// CONSTANT COMMENT 1
+#define STRING 2
+// CONSTANT STRING 2
+#define SSTRING 3
+// CONSTANT SSTRING 3
+
 /*
  * Here is the token struct. It is used for both the token linked-list and
  * env linked-list.
@@ -60,6 +70,8 @@ struct Token
 	 * this stores the value of the variable.
 	 */
 	char* value;
+	/* Also for the token linked-list, stores the type of the object inside it. */
+	int type;
 	/*
 	 * Used only for the env linked-list. It holds a string containing the
 	 * name of the var.

@@ -208,7 +208,7 @@ void collect_comment(FILE* input)
 }
 
 /* Function for collecting strings and removing the "" pair that goes with them */
-int collect_string(FILE* input, struct Token* n, int index)
+int collect_string(FILE* input, struct Token* n, int index, char initial)
 {
 	int string_done = FALSE;
 	char c;
@@ -219,7 +219,7 @@ int collect_string(FILE* input, struct Token* n, int index)
 		c = fgetc(input);
 		require(EOF != c, "IMPROPERLY TERMINATED STRING!\nABORTING HARD\n");
 
-		if('"' == c)
+		if(initial == c)
 		{ /* End of string */
 			string_done = TRUE;
 		}
@@ -265,13 +265,16 @@ int collect_token(FILE* input, struct Token* n)
 			command_done = TRUE;
 			token_done = TRUE;
 		}
-		else if('"' == c)
-		{ /* Handle strings -- everything between a pair of "" */
-			index = collect_string(input, n, index);
+		else if('"' == c || '\'' == c)
+		{ /* Handle strings -- everything between a pair of "" or '' */
+			if('"' == c) n->type = STRING;
+			if('\'' == c) n->type = SSTRING;
+			index = collect_string(input, n, index, c);
 			token_done = TRUE;
 		}
 		else if('#' == c)
 		{ /* Handle line comments */
+			n->type = COMMENT;
 			collect_comment(input);
 			command_done = TRUE;
 			token_done = TRUE;
@@ -744,6 +747,7 @@ int collect_command(FILE* script, char** argv)
 	{
 		n->value = calloc(MAX_STRING, sizeof(char));
 		require(n->value != NULL, "Memory initialization of n->value in collect_command failed\n");
+		n->type = NORMAL;
 		index = collect_token(script, n);
 		/* Don't allocate another node if the current one yielded nothing, OR
 		 * if we are done.
@@ -762,7 +766,7 @@ int collect_command(FILE* script, char** argv)
 	while(n != NULL)
 	{ /* Substitute variables into each token */
 		if(n->value == NULL) break;
-		n = handle_variables(argv, n);
+		if(n->type != SSTRING) n = handle_variables(argv, n);
 		/* There is potential that it could have moved n to the last node */
 		if(n->next == NULL) break;
 		/* Advance to next node */
@@ -774,7 +778,7 @@ int collect_command(FILE* script, char** argv)
 	while(n != NULL)
 	{
 		if(n->value == NULL) break;
-		strip_whitespace(n);
+		if(n->type != STRING && n->type != SSTRING) strip_whitespace(n);
 		/* Advance to next node */
 		n = n->next;
 	}
@@ -782,7 +786,8 @@ int collect_command(FILE* script, char** argv)
 	n = token;
 	while(n->next != NULL)
 	{
-		if(match(n->next->value, ""))
+		if(match(n->next->value, "") &&
+		  	(n->next->type != STRING && n->next->type != SSTRING))
 		{
 			n->next = n->next->next;
 			if(n->next == NULL) break;

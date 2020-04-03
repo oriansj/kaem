@@ -46,6 +46,8 @@ struct Token* variable_tokenize(struct Token* n)
 			/* Create the new node */
 			/* m is for n->next jumping around */
 			m = calloc(1, sizeof(struct Token));
+			/* Inherit parent's ->type */
+			m->type = n->type;
 			m->next = n->next;
 			n->next = m;
 			/* Now we don't need m */

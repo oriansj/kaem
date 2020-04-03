@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with mescc-tools.  If not, see <http://www.gnu.org/licenses/>.
 
-for i in $(seq 0 15) ; do
+for i in $(seq 0 17) ; do
     TEST=$(printf "%02d" $i)
     bin/kaem -f test/test${TEST}/kaem.test > test/results/test${TEST}-output 2>&1
 done

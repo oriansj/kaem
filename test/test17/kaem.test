@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with mescc-tools.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Test strings
-echo "string"
-echo 'string'
+# Test removal of whitespace, 1 and 2 should not remove, 3 should
+echo "string    "
+echo 'string    '
+echo string    
