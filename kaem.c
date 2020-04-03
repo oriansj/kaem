@@ -539,7 +539,7 @@ void echo()
 		/* M2-Planet doesn't let us do this in the while */
 		if(token->value == NULL) break;
 		file_print(token->value, stdout);
-		file_print(" ", stdout);
+		if(token->next != NULL) file_print(" ", stdout);
 		token = token->next;
 	}
 	file_print("\n", stdout);
@@ -665,11 +665,10 @@ int execute(char** argv)
 	char** envp;
 	/* Get the full path to the executable */
 	char* program = find_executable(token->value);
-	token->value = program;
 	/* Check we can find the executable */
-	if(NULL == program)
-	{ 
-		if(STRICT == TRUE)
+	if(NULL == program && NULL != token->value)
+	{
+		if(STRICT)
 		{
 			file_print("WHILE EXECUTING ", stderr);
 			file_print(token->value, stderr);
@@ -679,6 +678,7 @@ int execute(char** argv)
 		/* If we are not strict simply return */
 		return 0;
 	}
+	token->value = program;
 
 	/* Handle shebangs */
 	program = handle_shebang(program);
@@ -719,6 +719,17 @@ int execute(char** argv)
 	return rc;
 }
 
+void strip_whitespace(struct Token* n)
+{
+	/* Remove spaces from the end of each token */
+	int length = string_length(n->value) - 1;
+	while(n->value[length] == ' ')
+	{
+		n->value[length] = 0;
+		length = length - 1;
+	}
+}
+
 int collect_command(FILE* script, char** argv)
 {
 	command_done = FALSE;
@@ -755,6 +766,27 @@ int collect_command(FILE* script, char** argv)
 		/* There is potential that it could have moved n to the last node */
 		if(n->next == NULL) break;
 		/* Advance to next node */
+		n = n->next;
+	}
+
+	/* Strip trailing whitespaces from each token */
+	n = token;
+	while(n != NULL)
+	{
+		if(n->value == NULL) break;
+		strip_whitespace(n);
+		/* Advance to next node */
+		n = n->next;
+	}
+	/* Remove empty tokens */
+	n = token;
+	while(n->next != NULL)
+	{
+		if(match(n->next->value, ""))
+		{
+			n->next = n->next->next;
+			if(n->next == NULL) break;
+		}
 		n = n->next;
 	}
 
