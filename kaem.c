@@ -23,7 +23,7 @@
 #include "kaem.h"
 
 /* Prototypes from other files */
-struct Token* handle_variables(char** argv, struct Token* n);
+struct Token* handle_variables(char** argv, struct Token* n, int last_rc);
 
 /*
  * UTILITY FUNCTIONS
@@ -722,9 +722,9 @@ int execute(char** argv)
 	return rc;
 }
 
+/* Remove spaces from the end of each token */
 void strip_whitespace(struct Token* n)
 {
-	/* Remove spaces from the end of each token */
 	int length = string_length(n->value) - 1;
 	while(n->value[length] == ' ')
 	{
@@ -733,7 +733,7 @@ void strip_whitespace(struct Token* n)
 	}
 }
 
-int collect_command(FILE* script, char** argv)
+int collect_command(FILE* script, char** argv, int last_rc)
 {
 	command_done = FALSE;
 	/* Initialize token */
@@ -766,7 +766,7 @@ int collect_command(FILE* script, char** argv)
 	while(n != NULL)
 	{ /* Substitute variables into each token */
 		if(n->value == NULL) break;
-		if(n->type != SSTRING) n = handle_variables(argv, n);
+		if(n->type != SSTRING) n = handle_variables(argv, n, last_rc);
 		/* There is potential that it could have moved n to the last node */
 		if(n->next == NULL) break;
 		/* Advance to next node */
@@ -818,6 +818,7 @@ int collect_command(FILE* script, char** argv)
 /* Function for executing our programs with desired arguments */
 void run_script(FILE* script, char** argv)
 {
+	int status;
 	while(1)
 	{
 		/*
@@ -829,18 +830,15 @@ void run_script(FILE* script, char** argv)
 		 * We don't need the previous lines once they are done with, so tokens
 		 * are hence for each line.
 		 */
-		int index = collect_command(script, argv);
+		int index = collect_command(script, argv, status);
 		/* -1 means the script is done */
 		if(-1 == index) break;
 
 		/* Stuff to exec */
-		int status = execute(argv);
-		if(STRICT == TRUE && (0 != status))
+		status = execute(argv);
+		if(STRICT && status != 0)
 		{ /* Clearly the script hit an issue that should never have happened */
-			file_print("Subprocess error ", stderr);
-			file_print(numerate_number(status), stderr);
-			file_print("\nABORTING HARD\n", stderr);
-			exit(EXIT_FAILURE);
+			exit(status);
 		}
 	}
 }

@@ -283,13 +283,29 @@ void variable_all(char** argv, struct Token* n, int index)
 		n->value[index] = ' ';
 		index = index + 1;
 	}
+
 	/* Remove trailing space */
 	index = index - 1;
 	n->value[index] = 0;
 }
 
+/* Function to substitute the last return code */
+void variable_rc(int n_rc, struct Token* n, int index)
+{
+	/* Change index from the position of input to the position of n->value */
+	index = index + (string_length(n->value) - index);
+	char* rc = numerate_number(n_rc);
+	int i;
+	int rc_length = string_length(rc);
+	for(i = 0; i < rc_length; i = i + 1)
+	{
+		n->value[index] = rc[i];
+		index = index + 1;
+	}
+}
+
 /* Function controlling substitution of variables */
-struct Token* handle_variables(char** argv, struct Token* n)
+struct Token* handle_variables(char** argv, struct Token* n, int last_rc)
 {
 	/* NOTE: index is the position of input */
 	int index = 0;
@@ -333,6 +349,11 @@ substitute:
 	{ /* Handles $@ */
 		index = index + 1; /* We don't want the @ */
 		variable_all(argv, n, index);
+	}
+	else if(input[index] == '?')
+	{
+		index = index + 1;
+		variable_rc(last_rc, n, index);
 	}
 	else
 	{ /* We don't know that */
