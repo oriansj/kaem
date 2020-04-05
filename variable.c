@@ -217,16 +217,15 @@ int variable_substitute(char* input, struct Token* n, int index)
 }
 
 /* Function to concatenate all command line arguments */
-void variable_all(char** argv, struct Token* n)
+void variable_all(char** argv, struct Token* n, int index)
 {
 	fflush(stdout);
-	/* index refernences the index of n->value, unlike other functions */
-	int index = 0;
 	int argv_length = array_length(argv);
 	int i;
 	int j;
 	int argv_element_length;
 	char* argv_element = calloc(MAX_STRING, sizeof(char));
+
 	/* We don't want argv[0], as that contains the path to kaem */
 	/*
 	 * Loop through the arguments until we find the delimter between kaem args
@@ -260,6 +259,9 @@ void variable_all(char** argv, struct Token* n)
 			break;
 		}
 	}
+
+	/* Change index from the position of input to the position of n->value */
+	index = index + (string_length(n->value) - index);
 	/* We now know that argv[i] contains the first script argument */
 	for(i; i < argv_length; i = i + 1)
 	{
@@ -330,7 +332,7 @@ substitute:
 	else if(input[index] == '@')
 	{ /* Handles $@ */
 		index = index + 1; /* We don't want the @ */
-		variable_all(argv, n);
+		variable_all(argv, n, index);
 	}
 	else
 	{ /* We don't know that */
