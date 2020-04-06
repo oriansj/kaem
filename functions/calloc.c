@@ -33,8 +33,3 @@ void* calloc(int count, int size)
 	memset(ret, 0, (count * size));
 	return ret;
 }
-
-void free(void* l)
-{
-	return;
-}

@@ -17,43 +17,35 @@
 
 mkdir -p bin
 
-M2-Planet --architecture amd64 \
-	-f ../M2-Planet/test/common_amd64/functions/exit.c \
-	-f ../M2-Planet/test/common_amd64/functions/file.c \
-	-f functions/file_print.c \
-	-f ../M2-Planet/test/common_amd64/functions/malloc.c \
-	-f functions/calloc.c \
-	-f functions/match.c \
-	-f functions/string.c \
-	-f functions/in_set.c \
-	-f functions/require.c \
-	-f functions/numerate_number.c \
-	-f ../M2-Planet/test/common_amd64/functions/fork.c \
-	-f ../M2-Planet/test/common_amd64/functions/execve.c \
-	-f ../M2-Planet/test/common_amd64/functions/getcwd.c \
-	-f ../M2-Planet/test/common_amd64/functions/chdir.c \
-	-f kaem.h \
-	-f variable.c \
-	-f kaem.c \
+M2-Planet --architecture x86 \
+    -f ../M2-Planet/test/common_x86/functions/exit.c \
+    -f ../M2-Planet/test/common_x86/functions/file.c \
+    -f functions/file_print.c \
+    -f ../M2-Planet/test/common_x86/functions/malloc.c \
+    -f functions/calloc.c \
+    -f functions/match.c \
+    -f ../M2-Planet/test/common_x86/functions/fork.c \
+    -f ../M2-Planet/test/common_x86/functions/execve.c \
+    -f kaem.c \
 	--debug \
-	-o bin/kaem.M1
+	-o kaem.M1
 
-blood-elf --64 -f bin/kaem.M1 -o bin/kaem-footer.M1
+blood-elf --64 -f kaem.M1 -o kaem-footer.M1
 
-M1 -f ../M2-Planet/test/common_amd64/amd64_defs.M1 \
-	-f ../M2-Planet/test/common_amd64/libc-core.M1 \
-	-f bin/kaem.M1 \
-	-f bin/kaem-footer.M1 \
+M1 -f ../M2-Planet/test/common_x86/x86_defs.M1 \
+	-f ../M2-Planet/test/common_x86/libc-core.M1 \
+	-f kaem.M1 \
+	-f kaem-footer.M1 \
 	--LittleEndian \
-	--architecture amd64 \
-	-o bin/kaem.hex2
+	--architecture x86 \
+	-o kaem.hex2
 
-hex2 -f ../M2-Planet/test/common_amd64/ELF-amd64-debug.hex2 \
-	-f bin/kaem.hex2 \
+hex2 -f ../M2-Planet/test/common_x86/ELF-i386-debug.hex2 \
+	-f kaem.hex2 \
 	--LittleEndian \
-	--architecture amd64 \
+	--architecture x86 \
 	--BaseAddress 0x00600000 \
 	-o bin/kaem \
 	--exec_enable
 
-rm bin/kaem.M1 bin/kaem-footer.M1 bin/kaem.hex2
+rm kaem.M1 kaem-footer.M1 kaem.hex2
