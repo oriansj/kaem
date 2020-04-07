@@ -306,13 +306,32 @@ void variable_all(char** argv, struct Token* n, int index)
 		{
 			argv_element[j] = 0;
 		}
-		/* Ends up with (n->value) (argv[i]) */
-		/* Copy argv_element into n->value */
 		copy_string(argv_element, argv[i]);
+		/*
+		 * If there are spaces in argv[i] element we need to make sure that the
+		 * tokenization process afterwards doesn't tokenize argv[i].
+		 * To do this we places quotes around the element.
+		 */
 		argv_element_length = string_length(argv_element);
 		for(j = 0; j < argv_element_length; j = j + 1)
 		{
+			if(argv_element[j] == ' ')
+			{
+				n->value[index] = '"';
+				index = index + 1;
+				break;
+			}
+		}
+		/* Copy argv_element into n->value */
+		for(j = 0; j < argv_element_length; j = j + 1)
+		{
 			n->value[index] = argv_element[j];
+			index = index + 1;
+		}
+		/* Terminate the string, if there is one */
+		if(n->value[index - j - 1] == '"')
+		{
+			n->value[index] = '"';
 			index = index + 1;
 		}
 		/* Add space on the end */
