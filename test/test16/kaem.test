@@ -18,3 +18,5 @@
 VAR=string
 echo "${VAR}"
 echo '${VAR}'
+VAR_S="string1 string2"
+echo "${VAR_S}"

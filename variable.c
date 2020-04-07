@@ -25,6 +25,34 @@
 int array_length(char** array);
 char* env_lookup(char* variable);
 
+/* Tokenize strings in variable output */
+struct Token* variable_tokenize_string(struct Token* n, int i, char* input)
+{
+	if(!match(n->value, ""))
+	{ /* Need to make a new node */
+		/* Create the new node */
+		/* m is for n->next jumping around */
+		struct Token* m = calloc(1, sizeof(struct Token));
+		n->next = m;
+		/* Now we don't need m */
+		n = n->next;
+		n->value = calloc(MAX_STRING, sizeof(char));
+	}
+	/* Set the type to the appropriate string */
+	if(input[i] == '\'') n->type = SSTRING;
+	if(input[i] == '"') n->type = STRING;
+	/* Copy into n->value */
+	int j = 0;
+	i = i + 1;
+	while(input[i] != '\'' && input[i] != '"')
+	{
+		n->value[j] = input[i];
+		i = i + 1;
+		j = j + 1;
+	}
+	return n;
+}
+/* Tokenize variable output */
 struct Token* variable_tokenize(struct Token* n)
 {
 	int i;
@@ -41,7 +69,15 @@ struct Token* variable_tokenize(struct Token* n)
 	int k = 0;
 	for(i = 0; i < value_length; i = i + 1)
 	{
-		if(input[i] == ' ' || input[i] == '\t')
+		if(input[i] == '\'' || input[i] == '"')
+		{ /* Collect string */
+			n = variable_tokenize_string(n, i, input);
+			/* Traverse i to end of string */
+			i = i + 1;
+			while(input[i] != '\'' && input[i] != '"') i = i + 1;
+			k = 0;
+		}
+		else if(input[i] == ' ' || input[i] == '\t')
 		{ /* Split out into a new token */
 			/* Create the new node */
 			/* m is for n->next jumping around */
