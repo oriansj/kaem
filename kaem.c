@@ -719,6 +719,14 @@ int execute(char** argv)
 	/* And we should wait for it to complete */
 	waitpid(f, &rc, 0);
 
+	/*
+	 * waitpid(2)'s 'status' includes both the actual return code from
+	 * the program and the reason that the program terminated. We do not
+	 * want the 'reason code'. Hence, divide by 256 (bitshift of 8) to
+	 * remove the 'reason code'.
+	 */
+	rc = rc / 256;
+
 	return rc;
 }
 
