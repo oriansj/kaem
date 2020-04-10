@@ -43,8 +43,7 @@ struct Token* variable_tokenize_string(struct Token* n, int i, char* input)
 	if(input[i] == '"') n->type = STRING;
 	/* Copy into n->value */
 	int j = 0;
-	i = i + 1;
-	while(input[i] != '\'' && input[i] != '"')
+	while((input[i] != '\'' && input[i] != '"') || input[i] == '\\')
 	{
 		n->value[j] = input[i];
 		i = i + 1;
@@ -52,6 +51,7 @@ struct Token* variable_tokenize_string(struct Token* n, int i, char* input)
 	}
 	return n;
 }
+
 /* Tokenize variable output */
 struct Token* variable_tokenize(struct Token* n)
 {
@@ -69,12 +69,24 @@ struct Token* variable_tokenize(struct Token* n)
 	int k = 0;
 	for(i = 0; i < value_length; i = i + 1)
 	{
-		if(input[i] == '\'' || input[i] == '"')
+		if(input[i] == '\\')
+		{
+			n->value[k] = '\\';
+			k = k + 1;
+			i = i + 1;
+			n->value[k] = input[i];
+			k = k + 1;
+			continue;
+		}
+		else if(input[i] == '\'' || input[i] == '"')
 		{ /* Collect string */
 			n = variable_tokenize_string(n, i, input);
 			/* Traverse i to end of string */
 			i = i + 1;
-			while(input[i] != '\'' && input[i] != '"') i = i + 1;
+			while(input[i] != '\'' && input[i] != '"')
+			{
+				i = i + 1;
+			}
 			k = 0;
 		}
 		else if(input[i] == ' ' || input[i] == '\t')
@@ -109,7 +121,7 @@ int run_substitution(char* var_name, struct Token* n)
 {
 	char* value = env_lookup(var_name);
 	/* If there is nothing to substitute, don't substitute anything! */
-	if(value != NULL)
+	if(value != NULL && !match(value, ""))
 	{
 		n->value = prepend_string(n->value, value);
 		return TRUE;
@@ -232,7 +244,10 @@ int variable_substitute(char* input, struct Token* n, int index)
 			exit(EXIT_FAILURE);
 		}
 		else if('\\' == c)
-		{ /* Drop the \ - poor mans escaping. */
+		{
+			var_name[index - offset] = '\\';
+			index = index + 1;
+			var_name[index - offset] = c;
 			index = index + 1;
 		}
 		else if('}' == c)

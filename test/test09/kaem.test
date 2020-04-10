@@ -17,3 +17,4 @@
 # Test strings
 echo "string"
 echo 'string'
+echo "\"string"

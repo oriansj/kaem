@@ -219,7 +219,16 @@ int collect_string(FILE* input, struct Token* n, int index, char initial)
 		c = fgetc(input);
 		require(EOF != c, "IMPROPERLY TERMINATED STRING!\nABORTING HARD\n");
 
-		if(initial == c)
+		if('\\' == c)
+		{ /* Escaping (probably a quote) */
+			require(MAX_STRING > index + 1, "LINE IS TOO LONG\nABORTING HARD\n");
+			c = fgetc(input);
+			n->value[index] = '\\';
+			index = index + 1;
+			n->value[index] = c;
+			index = index + 1;
+		}
+		else if(initial == c)
 		{ /* End of string */
 			string_done = TRUE;
 		}
@@ -256,6 +265,18 @@ int collect_token(FILE* input, struct Token* n)
 			command_done = TRUE;
 			return -1;
 		}
+		else if('\\' == c)
+		{ /* Support for escapes; drops the char after */
+			c = fgetc(input); /* Skips over \, gets the next char */
+			if(c != '\n')
+			{ /* Put it into n->value, and skip the rest of the loop */
+				n->value[index] = '\\';
+				index = index + 1;
+				n->value[index] = c;
+				index = index + 1;
+				continue;
+			}
+		}
 		else if((' ' == c) || ('\t' == c))
 		{ /* Space and tab are token seperators */
 			token_done = TRUE;
@@ -278,28 +299,6 @@ int collect_token(FILE* input, struct Token* n)
 			collect_comment(input);
 			command_done = TRUE;
 			token_done = TRUE;
-		}
-		else if('\\' == c)
-		{ /* Support for escapes; drops the char after */
-			/******************************************************************
-			 * This is a design decision; it is primarily made for newlines.  *
-			 * Unlike the way normal shells do escapes (making the next char  *
-			 * actually do something), this just eats it up. Why? Simply, to  *
-			 * aid formatting (mostly through newlines). Eventually, we will  *
-			 * make it do it the proper way... but for now it's staying like  *
-			 * this. Feel free to send in a patch if you have a solution!     *
-			 * Because of this, I have decided that since the behaviour is    *
-			 * signficant enough, when warnings are enabled, we will give a   *
-			 * warning about this.                                            *
-			 ******************************************************************/
-			c = fgetc(input); /* Skips over \, gets the next char */
-			if(WARNINGS && c != '\n')
-			{
-				file_print("WARNING: The character '", stdout);
-				fputc(c, stdout);
-				file_print("' just got eaten up because of an unsupported escape sequence; see kaem.c:collect_token for more information.\n", stdout);
-			}
-			index = index + 2;
 		}
 		else if(0 == c)
 		{ /* We have come to the end of the token */
@@ -741,6 +740,26 @@ void strip_whitespace(struct Token* n)
 	}
 }
 
+/* Remove escapes */
+void remove_escapes(struct Token* n)
+{
+	int length = string_length(n->value);
+	int i;
+	int j;
+	for(i = 0; i < length; i = i + 1)
+	{
+		if(n->value[i] == '\\')
+		{
+			for(j = i + 1; j < length; j = j + 1)
+			{
+				n->value[j - 1] = n->value[j];
+			}
+			length = length - 1;
+			n->value[length] = 0;
+		}
+	}
+}
+
 int collect_command(FILE* script, char** argv, int last_rc)
 {
 	command_done = FALSE;
@@ -800,6 +819,16 @@ int collect_command(FILE* script, char** argv, int last_rc)
 			n->next = n->next->next;
 			if(n->next == NULL) break;
 		}
+		n = n->next;
+	}
+
+	/* Remove escapes */
+	n = token;
+	while(n != NULL)
+	{
+		if(n->value == NULL) break;
+		if(!is_envar(n->value)) remove_escapes(n);
+		/* Advance to next node */
 		n = n->next;
 	}
 
