@@ -548,6 +548,34 @@ void echo()
 	file_print("\n", stdout);
 }
 
+/* read builtin */
+int var_read()
+{
+	if(token->next == NULL)
+	{
+		return FALSE;
+	}
+	if(token->next->value == NULL)
+	{
+		return FALSE;
+	}
+	token = token->next; /* Skip read */
+	/* Now we are at the var */
+	char* var = token->value;
+	/* Read stdin into value */
+	char* value = calloc(MAX_STRING, sizeof(char));
+	int i = 0;
+	char c = fgetc(stdin);
+	while(c != '\n')
+	{
+		value[i] = c;
+		c = fgetc(stdin);
+		i = i + 1;
+	}
+	/* Create the var */
+	add_envar(var, value);
+}
+
 /* unset builtin */
 void unset()
 {
@@ -651,6 +679,12 @@ int execute(char** argv)
 	else if(match(token->value, "echo"))
 	{
 		echo();
+		return 0;
+	}
+	else if(match(token->value, "read"))
+	{
+		rc = var_read();
+		if(STRICT) require(rc == FALSE, "read failed!\n");
 		return 0;
 	}
 	else if(match(token->value, "unset"))
