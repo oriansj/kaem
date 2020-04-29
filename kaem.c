@@ -74,6 +74,7 @@ char* env_lookup(char* variable)
 /* Find the full path to an executable */
 char* find_executable(char* name)
 {
+	if(match("", name)) return NULL;
 	if(('.' == name[0]) || ('/' == name[0]))
 	{ /* assume names that start with . or / are relative or absolute */
 		return name;
@@ -194,12 +195,12 @@ void collect_comment(FILE* input)
 {
 	int c;
 	/* Eat up the comment, one character at a time */
-	/* 
+	/*
 	 * Sanity check that the comment ends with \n.
 	 * Remove the comment from the FILE*
 	 */
 	do
-	{ 
+	{
 		c = fgetc(input);
 		/* We reached an EOF!! */
 		require(EOF != c, "IMPROPERLY TERMINATED LINE COMMENT!\nABORTING HARD\n");
@@ -210,7 +211,7 @@ void collect_comment(FILE* input)
 int collect_string(FILE* input, struct Token* n, int index)
 {
 	int string_done = FALSE;
-	char c;
+	int c;
 	do
 	{
 		/* Bounds check */
@@ -235,7 +236,7 @@ int collect_string(FILE* input, struct Token* n, int index)
 /* Function to parse and assign token->value */
 int collect_token(FILE* input, struct Token* n)
 {
-	char c;
+	int c;
 	int token_done = FALSE;
 	char* token = calloc(MAX_STRING, sizeof(char));
 	require(token != NULL, "Memory initialization of token in collect_token failed\n");
@@ -360,7 +361,7 @@ int add_envar()
 		n = n->next;
 	}
 
-	/* 
+	/*
 	 * If you are confused about n->* and token->value here:
 	 * token->value: is the token with the raw data. Part of token linked list.
 	 * n->*: is where it goes. Part of env linked list.
@@ -380,7 +381,7 @@ int add_envar()
 
 	/* Get n->value */
 	index = index + 1; /* Skip over = */
-int offset = index;
+	int offset = index;
 	n->value = calloc(MAX_STRING, sizeof(char));
 	require(n->value != NULL, "Memory initialization of n->value in add_envar failed\n");
 	/* Copy into n->value up to end of token */
@@ -399,8 +400,8 @@ int cd()
 	if(NULL == token->next) return TRUE;
 	token = token->next;
 	if(NULL == token->value) return TRUE;
-	/* TODO: Add detection mechaninism for if chdir() fails. */
-	chdir(token->value);
+	int ret = chdir(token->value);
+	if(0 > ret) return TRUE;
 	return FALSE;
 }
 
@@ -410,7 +411,7 @@ int pwd()
 	char* path = calloc(MAX_STRING, sizeof(char));
 	require(path != NULL, "Memory initialization of path in pwd failed\n");
 	getcwd(path, MAX_STRING);
-	require(path != "", "getcwd() failed\n");
+	require(!match("", path), "getcwd() failed\n");
 	file_print(path, stdout);
 	file_print("\n", stdout);
 	return FALSE;
@@ -420,12 +421,12 @@ int pwd()
 int set()
 {
 	/* Get the options */
+	int i;
+	if(NULL == token->next) goto cleanup_set;
+	token = token->next;
+	if(NULL == token->value) goto cleanup_set;
 	char* options = calloc(MAX_STRING, sizeof(char));
 	require(options != NULL, "Memory initialization of options in set failed\n");
-	int i;
-	if(NULL == token->next) return TRUE;
-	token = token->next;
-	if(NULL == token->value) return TRUE;
 
 	int last_position = string_length(token->value) - 1;
 	for(i = 0; i < last_position; i = i + 1)
@@ -452,7 +453,7 @@ int set()
 		{ /* Show commands as executed */
 			/* TODO: this currently behaves like -v. Make it do what it should */
 			VERBOSE = TRUE;
-			/* 
+			/*
 			 * Output the set -x because VERBOSE didn't catch it before.
 			 * We don't do just -x because we support multiple options in one command,
 			 * eg set -ex.
@@ -470,6 +471,8 @@ int set()
 		}
 	}
 	return FALSE;
+cleanup_set:
+	return TRUE;
 }
 
 /* echo builtin */
@@ -525,7 +528,7 @@ void unset()
 }
 
 /* Execute program */
-int execute(char** argv)
+int execute()
 { /* Run the command */
 
 	/* rc = return code */
@@ -575,7 +578,7 @@ int execute(char** argv)
 	char* program = find_executable(token->value);
 	/* Check we can find the executable */
 	if(NULL == program)
-	{ 
+	{
 		if(STRICT == TRUE)
 		{
 			file_print("WHILE EXECUTING ", stderr);
@@ -590,7 +593,7 @@ int execute(char** argv)
 	int f = fork();
 	/* Ensure fork succeeded */
 	if (f == -1)
-	{ 
+	{
 		file_print("WHILE EXECUTING ", stderr);
 		file_print(token->value, stderr);
 		file_print("fork() FAILED\nABORTING HARD\n", stderr);
@@ -648,7 +651,7 @@ int collect_command(FILE* script, char** argv)
 		}
 	}
 	/* -1 means the script is done */
-	if(-1 == index) return index;
+	if(EOF == index) return index;
 
 	n = token;
 	while(n != NULL)
@@ -682,7 +685,7 @@ int collect_command(FILE* script, char** argv)
 /* Function for executing our programs with desired arguments */
 void run_script(FILE* script, char** argv)
 {
-	while(1)
+	while(TRUE)
 	{
 		/*
 		 * Tokens has to be reset each time, as we need a new linked-list for
@@ -695,10 +698,10 @@ void run_script(FILE* script, char** argv)
 		 */
 		int index = collect_command(script, argv);
 		/* -1 means the script is done */
-		if(-1 == index) break;
+		if(EOF == index) break;
 
 		/* Stuff to exec */
-		int status = execute(argv);
+		int status = execute();
 		if(STRICT == TRUE && (0 != status))
 		{ /* Clearly the script hit an issue that should never have happened */
 			file_print("Subprocess error ", stderr);
